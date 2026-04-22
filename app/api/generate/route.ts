@@ -33,7 +33,15 @@ function extractText(data: any): string {
   return parts.join("\n").trim();
 }
 
-function normalizeTone(value: unknown): "seo" | "marketing" | "short" {
+type Tone = "seo" | "marketing" | "short";
+
+type AltTextVariations = {
+  seo: string;
+  short: string;
+  marketing: string;
+};
+
+function normalizeTone(value: unknown): Tone {
   if (typeof value !== "string") {
     return "seo";
   }
@@ -46,28 +54,48 @@ function normalizeTone(value: unknown): "seo" | "marketing" | "short" {
   return "seo";
 }
 
-function toneInstruction(tone: "seo" | "marketing" | "short"): string {
-  if (tone === "marketing") {
-    return [
-      "Prioritize a polished marketing tone.",
-      "Make it persuasive and premium while remaining natural and believable.",
-      "Keep it visually descriptive, but slightly more lifestyle-oriented than technical.",
-    ].join("\n");
+function parseVariationPayload(rawText: string): AltTextVariations | null {
+  const normalized = rawText.trim();
+  const candidates = [normalized];
+
+  const fenceMatch = normalized.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch?.[1]) {
+    candidates.push(fenceMatch[1].trim());
   }
 
-  if (tone === "short") {
-    return [
-      "Prioritize brevity and clarity.",
-      "Keep it compact, clean, and easy to scan.",
-      "Use one short sentence when possible.",
-    ].join("\n");
+  const jsonMatch = normalized.match(/\{[\s\S]*\}/);
+  if (jsonMatch?.[0]) {
+    candidates.push(jsonMatch[0].trim());
   }
 
-  return [
-    "Prioritize SEO-friendly wording.",
-    "Use specific product-related phrases that can support discoverability.",
-    "Keep it descriptive, relevant, and search-aware without sounding spammy.",
-  ].join("\n");
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const seo = typeof parsed?.seo === "string" ? parsed.seo.trim() : "";
+      const short = typeof parsed?.short === "string" ? parsed.short.trim() : "";
+      const marketing = typeof parsed?.marketing === "string" ? parsed.marketing.trim() : "";
+
+      if (seo && short && marketing) {
+        return { seo, short, marketing };
+      }
+    } catch {
+      // Try the next candidate form.
+    }
+  }
+
+  return null;
+}
+
+function fallbackVariations(result: string): AltTextVariations {
+  return {
+    seo: result,
+    short: result,
+    marketing: result,
+  };
+}
+
+function selectedResult(variations: AltTextVariations, tone: Tone): string {
+  return variations[tone] || variations.seo;
 }
 
 export async function POST(req: Request) {
@@ -118,7 +146,7 @@ export async function POST(req: Request) {
         model: "gpt-4.1-mini",
         input: `You are an expert Greek ecommerce copywriter and SEO specialist.
 
-Create one alt text in natural, fluent Greek for the product page below.
+Create exactly 3 alt text variations in natural, fluent Greek for the product page below.
 
 Product page URL: ${parsedUrl.toString()}
 Detected product title: ${safeTitle}
@@ -129,16 +157,25 @@ Requested tone: ${selectedTone}
 Requirements:
 - Write in high-quality modern Greek
 - Detect the likely product type from the URL, title, and image URL clues
-- Make it SEO-friendly using specific, product-related wording
-- Make it more detailed and descriptive, while staying clean and readable
+- Make all versions specific, product-related, and visually descriptive
 - Mention likely color, material, and use-case when they can be reasonably inferred
 - If exact details are unknown, use the most likely safe ecommerce wording without inventing unrealistic claims
-- Maximum 2 sentences
+- Keep every variation to a maximum of 2 sentences
 - Do not use quotation marks
-- Do not add labels, explanations, multiple options, or extra text
-- Adapt the tone based on the requested style
-- ${toneInstruction(selectedTone)}
-- Return only the final alt text`,
+- Return valid JSON only
+
+Variation rules:
+- "seo": prioritize SEO-friendly wording and discoverability
+- "short": prioritize brevity, clarity, and one short sentence when possible
+- "marketing": prioritize a polished, premium, lightly persuasive tone
+- The requested tone is ${selectedTone}; make that variation especially strong, but still return all 3
+
+Return this exact shape:
+{
+  "seo": "...",
+  "short": "...",
+  "marketing": "..."
+}`,
       }),
     });
 
@@ -151,9 +188,18 @@ Requirements:
       );
     }
 
-    const result = extractText(data) || "No result";
+    const rawText = extractText(data) || "No result";
+    const variations = parseVariationPayload(rawText) || fallbackVariations(rawText);
+    const result = selectedResult(variations, selectedTone);
 
-    return NextResponse.json({ result }, { headers: corsHeaders });
+    return NextResponse.json(
+      {
+        result,
+        selectedTone,
+        variations,
+      },
+      { headers: corsHeaders },
+    );
   } catch (error) {
     console.error("API /api/generate error:", error);
 

@@ -204,7 +204,7 @@ function buildPayload(tone) {
   };
 }
 
-async function fetchVariation(tone) {
+async function fetchVariations(tone) {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -219,13 +219,22 @@ async function fetchVariation(tone) {
     throw new Error(data?.error || 'Request failed.');
   }
 
-  return data?.result || 'No result returned.';
-}
+  const variations = data?.variations;
+  if (
+    variations &&
+    typeof variations.seo === 'string' &&
+    typeof variations.short === 'string' &&
+    typeof variations.marketing === 'string'
+  ) {
+    return variations;
+  }
 
-function orderedVariations(selectedTone) {
-  const selected = VARIATIONS.find((item) => item.key === selectedTone);
-  const rest = VARIATIONS.filter((item) => item.key !== selectedTone);
-  return selected ? [selected, ...rest] : VARIATIONS;
+  const fallback = data?.result || 'No result returned.';
+  return {
+    seo: fallback,
+    short: fallback,
+    marketing: fallback,
+  };
 }
 
 function reuseHistoryItem(index) {
@@ -320,12 +329,7 @@ async function generateAltText() {
 
   try {
     const selectedTone = toneSelector.value;
-    const tones = orderedVariations(selectedTone);
-    const results = {};
-
-    for (const variation of tones) {
-      results[variation.key] = await fetchVariation(variation.key);
-    }
+    const results = await fetchVariations(selectedTone);
 
     setAllResults(results);
     rememberGeneration({

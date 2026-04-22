@@ -171,7 +171,12 @@ export default function Home() {
         throw new Error(data?.error || 'Something went wrong');
       }
 
-      const nextResult = data.result || '';
+      const nextResult =
+        data?.result ||
+        data?.variations?.seo ||
+        data?.variations?.short ||
+        data?.variations?.marketing ||
+        '';
       setResult(nextResult);
       setHistory((current) =>
         [
