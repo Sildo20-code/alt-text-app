@@ -63,7 +63,19 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `Create a short SEO-friendly alt text in Greek for this product page: ${parsedUrl.toString()}. Max 125 characters. Return only the alt text.`,
+        input: `You are an expert Greek ecommerce copywriter and SEO specialist.
+
+Create one alt text in natural, fluent Greek for the product page: ${parsedUrl.toString()}
+
+Requirements:
+- Write in high-quality modern Greek
+- Make it SEO-friendly using clear product-related wording
+- Keep it concise but still descriptive
+- Maximum 125 characters
+- Focus on what the product most likely is and its key visual/value details
+- Do not use quotation marks
+- Do not add labels, explanations, multiple options, or extra text
+- Return only the final alt text`,
       }),
     });
 
