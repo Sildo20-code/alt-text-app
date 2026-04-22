@@ -1,0 +1,1 @@
+Add 16x16, 32x32, and 128x128 PNG icons here later if you want toolbar/store branding.

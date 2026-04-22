@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type HistoryItem = {
   id: number;
   url: string;
   result: string;
 };
+
+const HISTORY_STORAGE_KEY = 'alt-text-history';
+const USAGE_STORAGE_KEY = 'alt-text-usage';
+const DAILY_LIMIT = 5;
 
 const featureItems = [
   {
@@ -23,11 +27,69 @@ const featureItems = [
   },
 ];
 
-const steps = [
-  'Paste product URL',
-  'Click Generate',
-  'Copy result',
-];
+const steps = ['Paste product URL', 'Click Generate', 'Copy result'];
+
+function getSeoScore(text: string): {
+  label: 'Basic' | 'Good' | 'Optimized';
+  color: string;
+  border: string;
+  background: string;
+} {
+  const trimmed = text.trim();
+  const length = trimmed.length;
+  const lower = trimmed.toLowerCase();
+
+  const keywordSignals = [
+    'για',
+    'με',
+    'σε',
+    'ξύλο',
+    'βαμβακερ',
+    'δερμ',
+    'μεταλλ',
+    'μαύρ',
+    'λευκ',
+    'μπλε',
+    'κόκκιν',
+    'καθημεριν',
+    'γραφείο',
+    'σαλόνι',
+    'ύπνο',
+    'τρέξιμο',
+    'γυμναστήριο',
+    'κουζίνα',
+  ];
+
+  const keywordCount = keywordSignals.reduce(
+    (count, keyword) => (lower.includes(keyword) ? count + 1 : count),
+    0,
+  );
+
+  if (length >= 90 && length <= 180 && keywordCount >= 3) {
+    return {
+      label: 'Optimized',
+      color: '#bbf7d0',
+      border: '1px solid rgba(34, 197, 94, 0.35)',
+      background: 'rgba(20, 83, 45, 0.35)',
+    };
+  }
+
+  if (length >= 55 && keywordCount >= 1) {
+    return {
+      label: 'Good',
+      color: '#fde68a',
+      border: '1px solid rgba(245, 158, 11, 0.35)',
+      background: 'rgba(120, 53, 15, 0.28)',
+    };
+  }
+
+  return {
+    label: 'Basic',
+    color: '#cbd5e1',
+    border: '1px solid rgba(148, 163, 184, 0.22)',
+    background: 'rgba(51, 65, 85, 0.28)',
+  };
+}
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -36,8 +98,61 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [usageCount, setUsageCount] = useState(0);
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const seoScore = getSeoScore(result);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (!stored) return;
+
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setHistory(parsed.slice(0, 5));
+      }
+    } catch {
+      window.localStorage.removeItem(HISTORY_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        HISTORY_STORAGE_KEY,
+        JSON.stringify(history.slice(0, 5)),
+      );
+    } catch {
+      // Ignore localStorage write failures.
+    }
+  }, [history]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(USAGE_STORAGE_KEY);
+      if (!stored) return;
+
+      const parsed = JSON.parse(stored);
+      if (parsed?.date === todayKey && typeof parsed?.count === 'number') {
+        setUsageCount(parsed.count);
+      } else {
+        window.localStorage.setItem(
+          USAGE_STORAGE_KEY,
+          JSON.stringify({ date: todayKey, count: 0 }),
+        );
+      }
+    } catch {
+      window.localStorage.removeItem(USAGE_STORAGE_KEY);
+    }
+  }, [todayKey]);
 
   const handleSubmit = async () => {
+    if (usageCount >= DAILY_LIMIT) {
+      setError('You have reached your daily free limit of 5 generations. Upgrade for unlimited access.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setResult('');
@@ -58,14 +173,28 @@ export default function Home() {
 
       const nextResult = data.result || '';
       setResult(nextResult);
-      setHistory((current) => [
-        {
-          id: Date.now(),
-          url,
-          result: nextResult,
-        },
-        ...current,
-      ]);
+      setHistory((current) =>
+        [
+          {
+            id: Date.now(),
+            url,
+            result: nextResult,
+          },
+          ...current.filter(
+            (item) => !(item.url === url && item.result === nextResult),
+          ),
+        ].slice(0, 5),
+      );
+      const nextCount = usageCount + 1;
+      setUsageCount(nextCount);
+      try {
+        window.localStorage.setItem(
+          USAGE_STORAGE_KEY,
+          JSON.stringify({ date: todayKey, count: nextCount }),
+        );
+      } catch {
+        // Ignore localStorage write failures.
+      }
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
     } finally {
@@ -80,15 +209,43 @@ export default function Home() {
     setCopied(false);
   };
 
-  const handleCopy = async () => {
-    if (!result) return;
-
+  const handleCopyText = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(result);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      setError('');
     } catch {
       setError('Could not copy the generated alt text. Please try again.');
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!result) return;
+    await handleCopyText(result);
+  };
+
+  const handleCopyHistoryItem = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    text: string,
+  ) => {
+    event.stopPropagation();
+    await handleCopyText(text);
+  };
+
+  const handleReuse = (item: HistoryItem) => {
+    setUrl(item.url);
+    setResult(item.result);
+    setError('');
+    setCopied(false);
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      window.localStorage.removeItem(HISTORY_STORAGE_KEY);
+    } catch {
+      // Ignore localStorage clear failures.
     }
   };
 
@@ -186,7 +343,15 @@ export default function Home() {
             }}
           >
             <div style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: '#60a5fa',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
                 Generator
               </div>
               <h2 style={{ margin: 0, fontSize: '32px', lineHeight: 1.1 }}>
@@ -195,6 +360,50 @@ export default function Home() {
               <p style={{ margin: 0, color: '#94a3b8', lineHeight: 1.75, fontSize: '16px' }}>
                 Built for ecommerce teams that need fast, descriptive, SEO-aware product image text.
               </p>
+            </div>
+
+            <div
+              style={{
+                padding: '16px 18px',
+                borderRadius: '16px',
+                background:
+                  usageCount >= DAILY_LIMIT
+                    ? 'linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(154, 52, 18, 0.22) 100%)'
+                    : 'linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(15, 23, 42, 0.2) 100%)',
+                border:
+                  usageCount >= DAILY_LIMIT
+                    ? '1px solid rgba(251, 191, 36, 0.34)'
+                    : '1px solid rgba(96, 165, 250, 0.18)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '14px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '4px' }}>
+                <strong style={{ color: '#f8fafc', fontSize: '14px' }}>
+                  Upgrade for unlimited
+                </strong>
+                <span style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
+                  {usageCount >= DAILY_LIMIT
+                    ? 'Your free daily limit is reached.'
+                    : `${DAILY_LIMIT - usageCount} free generation${DAILY_LIMIT - usageCount === 1 ? '' : 's'} left today.`}
+                </span>
+              </div>
+              <span
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '999px',
+                  background: 'rgba(2, 6, 23, 0.42)',
+                  border: '1px solid rgba(148, 163, 184, 0.16)',
+                  color: '#f8fafc',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                }}
+              >
+                {usageCount}/{DAILY_LIMIT} used today
+              </span>
             </div>
 
             <div style={{ display: 'grid', gap: '10px' }}>
@@ -241,22 +450,25 @@ export default function Home() {
             >
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || usageCount >= DAILY_LIMIT}
                 style={{
                   padding: '14px 20px',
                   fontSize: '15px',
                   border: '1px solid rgba(96, 165, 250, 0.35)',
                   borderRadius: '14px',
-                  background: loading
+                  background: loading || usageCount >= DAILY_LIMIT
                     ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
                     : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#fff',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: loading || usageCount >= DAILY_LIMIT ? 'not-allowed' : 'pointer',
                   fontWeight: 700,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '10px',
-                  boxShadow: loading ? 'none' : '0 14px 36px rgba(37, 99, 235, 0.30)',
+                  boxShadow:
+                    loading || usageCount >= DAILY_LIMIT
+                      ? 'none'
+                      : '0 14px 36px rgba(37, 99, 235, 0.30)',
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
                 }}
               >
@@ -273,7 +485,7 @@ export default function Home() {
                     }}
                   />
                 ) : null}
-                {loading ? 'Generating...' : 'Generate'}
+                {loading ? 'Generating...' : usageCount >= DAILY_LIMIT ? 'Limit reached' : 'Generate'}
               </button>
 
               <button
@@ -352,9 +564,35 @@ export default function Home() {
                 <h2 style={{ margin: 0, fontSize: '18px', color: '#f8fafc' }}>
                   Generated Alt Text
                 </h2>
-                <span style={{ fontSize: '14px', color: '#94a3b8' }}>
-                  {loading ? 'Working on your result...' : 'Ready'}
-                </span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {result ? (
+                    <span
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: seoScore.color,
+                        border: seoScore.border,
+                        background: seoScore.background,
+                      }}
+                    >
+                      SEO Score: {seoScore.label}
+                    </span>
+                  ) : null}
+                  <span style={{ fontSize: '14px', color: '#94a3b8' }}>
+                    {loading ? 'Working on your result...' : 'Ready'}
+                  </span>
+                </div>
               </div>
 
               <p
@@ -477,9 +715,34 @@ export default function Home() {
             }}
           >
             <h2 style={{ margin: 0, fontSize: '24px' }}>Recent History</h2>
-            <span style={{ fontSize: '14px', color: '#94a3b8' }}>
-              {history.length} item{history.length === 1 ? '' : 's'}
-            </span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span style={{ fontSize: '14px', color: '#94a3b8' }}>
+                {history.length} item{history.length === 1 ? '' : 's'}
+              </span>
+              {history.length > 0 ? (
+                <button
+                  onClick={handleClearHistory}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(148, 163, 184, 0.22)',
+                    background: 'rgba(15, 23, 42, 0.88)',
+                    color: '#e2e8f0',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  Clear history
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {history.length === 0 ? (
@@ -504,9 +767,11 @@ export default function Home() {
               }}
             >
               {history.map((item) => (
-                <div
+                <button
                   key={item.id}
+                  onClick={() => handleReuse(item)}
                   style={{
+                    textAlign: 'left',
                     padding: '18px',
                     borderRadius: '20px',
                     border: '1px solid rgba(148, 163, 184, 0.14)',
@@ -514,6 +779,7 @@ export default function Home() {
                     boxShadow: '0 14px 40px rgba(2, 6, 23, 0.28)',
                     display: 'grid',
                     gap: '8px',
+                    cursor: 'pointer',
                   }}
                 >
                   <span
@@ -534,7 +800,42 @@ export default function Home() {
                   >
                     {item.result}
                   </span>
-                </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        color: '#94a3b8',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        fontWeight: 700,
+                      }}
+                    >
+                      Click to reuse
+                    </span>
+                    <button
+                      onClick={(event) => handleCopyHistoryItem(event, item.result)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(148, 163, 184, 0.22)',
+                        background: 'rgba(2, 6, 23, 0.6)',
+                        color: '#f8fafc',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </button>
               ))}
             </div>
           )}

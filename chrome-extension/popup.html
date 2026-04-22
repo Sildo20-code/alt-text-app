@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alt Text Generator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <section class="popup-card">
+        <div class="eyebrow">AI for ecommerce</div>
+        <h1>Alt Text Generator</h1>
+        <p class="subtitle">Generate SEO-friendly Greek alt text for the current product page.</p>
+
+        <div class="field-group">
+          <label for="current-url">Current page URL</label>
+          <textarea id="current-url" readonly></textarea>
+        </div>
+
+        <div class="meta-row" id="meta-row">
+          <div class="meta-block">
+            <span class="meta-label">Title</span>
+            <span class="meta-value" id="page-title">Loading...</span>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">Description</span>
+            <span class="meta-value" id="page-description">Loading...</span>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="tone-selector">Preferred tone</label>
+          <select id="tone-selector" class="tone-selector">
+            <option value="seo">SEO</option>
+            <option value="marketing">Marketing</option>
+            <option value="short">Short</option>
+          </select>
+        </div>
+
+        <div id="upgrade-banner" class="upgrade-banner">
+          <div>
+            <strong>Upgrade for unlimited</strong>
+            <span id="usage-message">5 free generations left today.</span>
+          </div>
+          <span id="usage-badge" class="usage-badge">0/5 used today</span>
+        </div>
+
+        <div class="actions">
+          <button id="generate-button" class="primary-button">Generate Alt Text</button>
+          <button id="clear-button" class="secondary-button" type="button">Clear</button>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+        <div id="error" class="error" role="alert" hidden></div>
+
+        <section class="result-card">
+          <div class="result-header">
+            <h2>Generated Variations</h2>
+            <span class="result-caption">3 ready-to-use options</span>
+          </div>
+          <div id="results-grid" class="results-grid">
+            <article class="variation-card">
+              <div class="variation-header">
+                <div>
+                  <span class="variation-kicker">SEO optimized</span>
+                  <h3>SEO version</h3>
+                </div>
+                <button class="ghost-button result-copy-button" data-copy-target="seo-result" disabled>Copy</button>
+              </div>
+              <p id="seo-result" class="result-text">Your SEO-focused alt text will appear here.</p>
+            </article>
+
+            <article class="variation-card">
+              <div class="variation-header">
+                <div>
+                  <span class="variation-kicker">Short version</span>
+                  <h3>Compact version</h3>
+                </div>
+                <button class="ghost-button result-copy-button" data-copy-target="short-result" disabled>Copy</button>
+              </div>
+              <p id="short-result" class="result-text">Your shorter alt text version will appear here.</p>
+            </article>
+
+            <article class="variation-card">
+              <div class="variation-header">
+                <div>
+                  <span class="variation-kicker">Marketing style</span>
+                  <h3>Marketing version</h3>
+                </div>
+                <button class="ghost-button result-copy-button" data-copy-target="marketing-result" disabled>Copy</button>
+              </div>
+              <p id="marketing-result" class="result-text">Your marketing-style alt text will appear here.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="history-card">
+          <div class="result-header">
+            <h2>History</h2>
+            <span class="result-caption">Last 5 generations</span>
+          </div>
+          <div id="history-list" class="history-list">
+            <p class="history-empty">Your recent generations will appear here.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
