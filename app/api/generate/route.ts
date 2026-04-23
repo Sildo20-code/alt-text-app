@@ -75,22 +75,42 @@ function normalizeLanguage(value: unknown): Language {
 
 function languageInstruction(language: Language): string {
   if (language === "greek") {
-    return "Write all output in natural modern Greek.";
+    return "Write all output in natural modern Greek. Do not use English, German, French, or Spanish.";
   }
 
   if (language === "german") {
-    return "Write all output in natural professional German.";
+    return "Write all output in natural professional German. Do not use English, Greek, French, or Spanish.";
   }
 
   if (language === "french") {
-    return "Write all output in natural professional French.";
+    return "Write all output in natural professional French. Do not use English, Greek, German, or Spanish.";
   }
 
   if (language === "spanish") {
-    return "Write all output in natural professional Spanish.";
+    return "Write all output in natural professional Spanish. Do not use English, Greek, German, or French.";
   }
 
-  return "Write all output in natural professional English.";
+  return "Write all output in natural professional English. Do not use Greek, German, French, or Spanish.";
+}
+
+function languageLabel(language: Language): string {
+  if (language === "greek") {
+    return "Greek";
+  }
+
+  if (language === "german") {
+    return "German";
+  }
+
+  if (language === "french") {
+    return "French";
+  }
+
+  if (language === "spanish") {
+    return "Spanish";
+  }
+
+  return "English";
 }
 
 function parseVariationPayload(rawText: string): AltTextVariations | null {
@@ -197,6 +217,10 @@ Requested language: ${selectedLanguage}
 
 Requirements:
 - ${languageInstruction(selectedLanguage)}
+- All 3 variations must be written entirely in ${languageLabel(selectedLanguage)}
+- If the detected title, description, or URL hints are in another language, still generate the final output in ${languageLabel(selectedLanguage)}
+- Translate or adapt product clues into ${languageLabel(selectedLanguage)} when needed
+- Never default to Greek unless the requested language is Greek
 - Detect the likely product type from the URL, title, and image URL clues
 - Make all versions specific, product-related, and visually descriptive
 - Make the wording concise, natural, SEO-friendly, and accessibility-friendly
@@ -216,9 +240,9 @@ Variation rules:
 
 Return this exact shape:
 {
-  "seo": "...",
-  "short": "...",
-  "marketing": "..."
+  "seo": "text in ${languageLabel(selectedLanguage)}",
+  "short": "text in ${languageLabel(selectedLanguage)}",
+  "marketing": "text in ${languageLabel(selectedLanguage)}"
 }`,
       }),
     });
