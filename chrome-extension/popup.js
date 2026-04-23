@@ -5,6 +5,7 @@ const USAGE_KEY = 'altTextGeneratorUsage';
 const DAILY_LIMIT = 5;
 const DEV_DISABLE_LIMIT = false;
 const LANGUAGE_KEY = 'altTextGeneratorLanguage';
+const OWNER_KEY_STORAGE_KEY = 'altTextGeneratorOwnerKey';
 const VARIATIONS = [
   { key: 'seo', label: 'SEO optimized', placeholder: 'Your SEO-focused alt text will appear here.' },
   { key: 'short', label: 'Short version', placeholder: 'Your shorter alt text version will appear here.' },
@@ -45,6 +46,8 @@ let latestResults = {
   short: '',
   marketing: '',
 };
+let ownerKey = '';
+let ownerBypassActive = false;
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -99,13 +102,23 @@ function saveLanguage(language) {
   localStorage.setItem(LANGUAGE_KEY, language);
 }
 
+function loadOwnerKey() {
+  return localStorage.getItem(OWNER_KEY_STORAGE_KEY) || '';
+}
+
 function updateUsageUi() {
   const usage = loadUsage();
   const remaining = Math.max(0, DAILY_LIMIT - usage.count);
-  const limited = !DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT;
+  const hasOwnerKey = Boolean(ownerKey.trim());
+  const limitDisabled = DEV_DISABLE_LIMIT || ownerBypassActive;
+  const limited = !limitDisabled && usage.count >= DAILY_LIMIT;
 
-  usageMessage.textContent = DEV_DISABLE_LIMIT
-    ? 'Development mode: daily limit is temporarily disabled.'
+  usageMessage.textContent = limitDisabled
+    ? ownerBypassActive || ownerKey.trim()
+      ? 'Owner mode: unlimited usage is active on this device.'
+      : 'Development mode: daily limit is temporarily disabled.'
+    : hasOwnerKey
+      ? 'Owner key detected. It will be verified by the server on your next request.'
     : limited
       ? 'Your free daily limit is reached.'
       : `${remaining} free generation${remaining === 1 ? '' : 's'} left today.`;
@@ -121,7 +134,7 @@ async function getActiveTab() {
 
 function setLoadingState(isLoading) {
   const usage = loadUsage();
-  const limited = !DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT;
+  const limited = !(DEV_DISABLE_LIMIT || ownerBypassActive) && usage.count >= DAILY_LIMIT;
 
   generateButton.disabled = isLoading || !activeContext.url || limited;
   generateButton.textContent = isLoading
@@ -259,6 +272,7 @@ async function fetchVariations(tone) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(ownerKey.trim() ? { 'x-owner-key': ownerKey.trim() } : {}),
     },
     body: JSON.stringify(buildPayload(tone)),
   });
@@ -276,14 +290,20 @@ async function fetchVariations(tone) {
     typeof variations.short === 'string' &&
     typeof variations.marketing === 'string'
   ) {
-    return variations;
+    return {
+      ownerBypassActive: Boolean(data?.ownerBypassActive),
+      variations,
+    };
   }
 
   const fallback = data?.result || 'No result returned.';
   return {
-    seo: fallback,
-    short: fallback,
-    marketing: fallback,
+    ownerBypassActive: Boolean(data?.ownerBypassActive),
+    variations: {
+      seo: fallback,
+      short: fallback,
+      marketing: fallback,
+    },
   };
 }
 
@@ -366,7 +386,8 @@ async function generateAltText() {
   }
 
   const usage = updateUsageUi();
-  if (!DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT) {
+  const limitReached = !(DEV_DISABLE_LIMIT || ownerBypassActive) && usage.count >= DAILY_LIMIT;
+  if (limitReached && !ownerKey.trim()) {
     setError('You have reached your daily free limit. Upgrade for unlimited access.');
     setLoadingState(false);
     return;
@@ -379,7 +400,14 @@ async function generateAltText() {
 
   try {
     const selectedTone = toneSelector.value;
-    const results = await fetchVariations(selectedTone);
+    const responsePayload = await fetchVariations(selectedTone);
+    const results = responsePayload.variations;
+    ownerBypassActive = responsePayload.ownerBypassActive;
+    if (limitReached && !responsePayload.ownerBypassActive) {
+      setStatus('');
+      setError('You have reached your daily free limit. Upgrade for unlimited access.');
+      return;
+    }
 
     setAllResults(results);
     rememberGeneration({
@@ -392,7 +420,9 @@ async function generateAltText() {
       toneLabel: (VARIATIONS.find((item) => item.key === selectedTone)?.label || 'SEO'),
       createdAt: formatTimestamp(),
     });
-    saveUsage(usage.count + 1);
+    if (!responsePayload.ownerBypassActive) {
+      saveUsage(usage.count + 1);
+    }
     updateUsageUi();
     setStatus('3 alt text variations generated successfully.');
   } catch (error) {
@@ -504,6 +534,7 @@ function clearResult() {
 }
 
 languageSelector.value = loadLanguage();
+ownerKey = loadOwnerKey();
 languageSelector.addEventListener('change', () => {
   saveLanguage(languageSelector.value || 'english');
 });

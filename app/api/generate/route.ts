@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, x-owner-key",
 };
 
 function extractText(data: any): string {
@@ -369,6 +369,11 @@ function selectedResult(variations: AltTextVariations, tone: Tone): string {
 
 export async function POST(req: Request) {
   try {
+    const ownerHeader = req.headers.get("x-owner-key")?.trim() || "";
+    const configuredOwnerKey = process.env.OWNER_BYPASS_KEY?.trim() || "";
+    const ownerBypassActive =
+      Boolean(configuredOwnerKey) && ownerHeader.length > 0 && ownerHeader === configuredOwnerKey;
+
     const { url, language, tone, title, description, imageUrl } = await req.json();
 
     if (!url || typeof url !== "string") {
@@ -475,6 +480,7 @@ export async function POST(req: Request) {
         result,
         selectedTone,
         selectedLanguage,
+        ownerBypassActive,
         variations,
       },
       { headers: corsHeaders },
