@@ -18,7 +18,6 @@ const USAGE_STORAGE_KEY = 'alt-text-usage';
 const DAILY_LIMIT = 5;
 const DEV_DISABLE_LIMIT = false;
 const LANGUAGE_STORAGE_KEY = 'alt-text-language';
-const OWNER_KEY_STORAGE_KEY = 'alt-text-owner-key';
 const LANGUAGES: LanguageOption[] = [
   { value: 'english', label: 'English' },
   { value: 'greek', label: 'Greek' },
@@ -115,13 +114,10 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usageCount, setUsageCount] = useState(0);
   const [language, setLanguage] = useState<LanguageOption['value']>('english');
-  const [ownerKey, setOwnerKey] = useState('');
-  const [ownerBypassActive, setOwnerBypassActive] = useState(false);
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const seoScore = getSeoScore(result);
-  const hasOwnerKey = Boolean(ownerKey.trim());
-  const isLimitDisabled = DEV_DISABLE_LIMIT || ownerBypassActive;
+  const isLimitDisabled = DEV_DISABLE_LIMIT;
   const isLimitReached = !isLimitDisabled && usageCount >= DAILY_LIMIT;
 
   useEffect(() => {
@@ -138,16 +134,6 @@ export default function Home() {
       }
     } catch {
       window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      const storedOwnerKey = window.localStorage.getItem(OWNER_KEY_STORAGE_KEY) || '';
-      setOwnerKey(storedOwnerKey);
-      setOwnerBypassActive(false);
-    } catch {
-      window.localStorage.removeItem(OWNER_KEY_STORAGE_KEY);
     }
   }, []);
 
@@ -217,10 +203,7 @@ export default function Home() {
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(ownerKey.trim() ? { 'x-owner-key': ownerKey.trim() } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, language }),
       });
 
@@ -236,12 +219,6 @@ export default function Home() {
         data?.variations?.short ||
         data?.variations?.marketing ||
         '';
-      const ownerBypassConfirmed = Boolean(data?.ownerBypassActive);
-      setOwnerBypassActive(ownerBypassConfirmed);
-      if (isLimitReached && !ownerBypassConfirmed) {
-        setError('You have reached your daily free limit of 5 generations. Upgrade for unlimited access.');
-        return;
-      }
       setResult(nextResult);
       setHistory((current) =>
         [
@@ -255,17 +232,15 @@ export default function Home() {
           ),
         ].slice(0, 5),
       );
-      if (!ownerBypassConfirmed) {
-        const nextCount = usageCount + 1;
-        setUsageCount(nextCount);
-        try {
-          window.localStorage.setItem(
-            USAGE_STORAGE_KEY,
-            JSON.stringify({ date: todayKey, count: nextCount }),
-          );
-        } catch {
-          // Ignore localStorage write failures.
-        }
+      const nextCount = usageCount + 1;
+      setUsageCount(nextCount);
+      try {
+        window.localStorage.setItem(
+          USAGE_STORAGE_KEY,
+          JSON.stringify({ date: todayKey, count: nextCount }),
+        );
+      } catch {
+        // Ignore localStorage write failures.
       }
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
@@ -459,11 +434,7 @@ export default function Home() {
                 </strong>
                 <span style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
                   {isLimitDisabled
-                    ? ownerBypassActive
-                      ? 'Owner mode: unlimited usage is active on this device.'
-                      : 'Development mode: daily limit is temporarily disabled.'
-                    : hasOwnerKey
-                    ? 'Owner key detected. It will be verified by the server on your next request.'
+                    ? 'Development mode: daily limit is temporarily disabled.'
                     : isLimitReached
                     ? 'Your free daily limit is reached.'
                     : `${DAILY_LIMIT - usageCount} free generation${DAILY_LIMIT - usageCount === 1 ? '' : 's'} left today.`}
