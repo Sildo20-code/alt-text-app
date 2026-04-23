@@ -316,6 +316,15 @@ button:disabled:hover {
 .history-item-meta {
   color: #93c5fd;
   font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.history-item-time {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .history-item-body {

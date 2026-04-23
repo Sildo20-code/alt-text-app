@@ -14,6 +14,8 @@ const pageTitleField = document.getElementById('page-title');
 const pageDescriptionField = document.getElementById('page-description');
 const toneSelector = document.getElementById('tone-selector');
 const generateButton = document.getElementById('generate-button');
+const copyAllButton = document.getElementById('copy-all-button');
+const exportButton = document.getElementById('export-button');
 const clearButton = document.getElementById('clear-button');
 const statusElement = document.getElementById('status');
 const errorElement = document.getElementById('error');
@@ -33,6 +35,12 @@ let activeContext = {
   title: '',
   description: '',
   imageUrl: '',
+};
+
+let latestResults = {
+  seo: '',
+  short: '',
+  marketing: '',
 };
 
 function todayKey() {
@@ -98,6 +106,10 @@ function setLoadingState(isLoading) {
       ? 'Limit reached'
       : 'Generate Alt Text';
   toneSelector.disabled = isLoading;
+  if (isLoading) {
+    copyAllButton.disabled = true;
+    exportButton.disabled = true;
+  }
 }
 
 function setStatus(message = '') {
@@ -125,9 +137,19 @@ function setResult(key, result = '') {
 }
 
 function setAllResults(results = {}) {
+  latestResults = {
+    seo: results.seo || '',
+    short: results.short || '',
+    marketing: results.marketing || '',
+  };
+
   for (const variation of VARIATIONS) {
     setResult(variation.key, results[variation.key] || '');
   }
+
+  const hasAnyResult = VARIATIONS.some((variation) => Boolean(latestResults[variation.key]));
+  copyAllButton.disabled = !hasAnyResult;
+  exportButton.disabled = !hasAnyResult;
 }
 
 function loadHistory() {
@@ -161,7 +183,8 @@ function renderHistory() {
       (item, index) => `
         <button class="history-item" type="button" data-history-index="${index}">
           <span class="history-item-title">${escapeHtml(item.title || item.url || 'Saved generation')}</span>
-          <span class="history-item-meta">${escapeHtml(item.toneLabel)} | ${escapeHtml(item.createdAt)}</span>
+          <span class="history-item-meta">${escapeHtml(item.toneLabel)}</span>
+          <span class="history-item-time">${escapeHtml(item.createdAt)}</span>
           <span class="history-item-body">${escapeHtml(item.results[item.selectedTone] || item.results.seo || '')}</span>
         </button>
       `,
@@ -178,6 +201,7 @@ function rememberGeneration(entry) {
 
 function formatTimestamp() {
   return new Date().toLocaleString(undefined, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -257,7 +281,7 @@ function reuseHistoryItem(index) {
   toneSelector.value = item.selectedTone || 'seo';
   setAllResults(item.results || {});
   setError('');
-  setStatus('Loaded from history.');
+  setStatus(`Loaded from history | ${item.createdAt || 'saved item'}.`);
 }
 
 async function loadPageContext() {
@@ -374,6 +398,79 @@ async function copyResult(targetId, button) {
   }
 }
 
+function buildCopyAllText() {
+  return [
+    'Alt Text Variations',
+    '',
+    `Page URL: ${activeContext.url || 'N/A'}`,
+    `Detected title: ${activeContext.title || 'N/A'}`,
+    `Timestamp: ${formatTimestamp()}`,
+    '',
+    'SEO optimized:',
+    latestResults.seo || 'N/A',
+    '',
+    'Short:',
+    latestResults.short || 'N/A',
+    '',
+    'Marketing:',
+    latestResults.marketing || 'N/A',
+  ].join('\n');
+}
+
+async function copyAllResults() {
+  if (!latestResults.seo && !latestResults.short && !latestResults.marketing) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(buildCopyAllText());
+    const previousText = copyAllButton.textContent;
+    copyAllButton.textContent = 'Copied!';
+    setStatus('All variations copied successfully.');
+    setTimeout(() => {
+      copyAllButton.textContent = previousText || 'Copy All';
+    }, 1500);
+  } catch (error) {
+    setError('Could not copy all variations.');
+  }
+}
+
+function exportVariations() {
+  if (!latestResults.seo && !latestResults.short && !latestResults.marketing) {
+    return;
+  }
+
+  const fileContent = [
+    'Alt Text Generator Export',
+    '',
+    `Page URL: ${activeContext.url || 'N/A'}`,
+    `Detected title: ${activeContext.title || 'N/A'}`,
+    `Timestamp: ${formatTimestamp()}`,
+    '',
+    'SEO variation:',
+    latestResults.seo || 'N/A',
+    '',
+    'Short variation:',
+    latestResults.short || 'N/A',
+    '',
+    'Marketing variation:',
+    latestResults.marketing || 'N/A',
+    '',
+  ].join('\n');
+
+  const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const safeDate = new Date().toISOString().replace(/[:.]/g, '-');
+  link.href = blobUrl;
+  link.download = `alt-text-variations-${safeDate}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(blobUrl);
+  setStatus('TXT export downloaded.');
+}
+
 function clearResult() {
   setError('');
   setStatus('Ready to generate alt text.');
@@ -381,6 +478,8 @@ function clearResult() {
 }
 
 generateButton.addEventListener('click', generateAltText);
+copyAllButton.addEventListener('click', copyAllResults);
+exportButton.addEventListener('click', exportVariations);
 clearButton.addEventListener('click', clearResult);
 copyButtons.forEach((button) => {
   button.addEventListener('click', () => copyResult(button.dataset.copyTarget, button));
