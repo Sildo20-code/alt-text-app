@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SEO Alt Text Assistant",
   "version": "1.2.0",
-  "description": "Generate SEO-friendly Greek alt text variations for ecommerce product pages in one click.",
+  "description": "Generate SEO-friendly multilingual alt text for ecommerce product pages in one click.",
   "homepage_url": "https://alt-text-q6lg8jonb-ersil.vercel.app",
   "minimum_chrome_version": "114",
   "icons": {

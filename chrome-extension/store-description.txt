@@ -1,10 +1,10 @@
 Short description
-SEO Alt Text Assistant helps ecommerce teams generate polished Greek alt text variations for product pages in one click.
+Generate SEO-friendly multilingual alt text for ecommerce product pages in one click.
 
 Full Chrome Web Store description
 SEO Alt Text Assistant is a professional productivity extension for ecommerce teams, store owners, agencies, and SEO specialists who need better alt text faster.
 
-Open any product page, launch the extension, and generate three ready-to-use Greek alt text variations from a single request:
+Open any product page, launch the extension, and generate three ready-to-use alt text variations from a single request in your selected language:
 - SEO optimized
 - Short version
 - Marketing style
@@ -20,7 +20,8 @@ Built for real-world ecommerce workflows, SEO Alt Text Assistant helps you:
 
 Core features
 - Generate 3 alt text variations from one request
-- Greek-language output for ecommerce product pages
+- Multilingual output for ecommerce product pages
+- Language support for English, Greek, German, French, and Spanish
 - SEO, Short, and Marketing tone options
 - Copy each variation individually
 - Copy all variations in one formatted block
