@@ -16,6 +16,7 @@ type LanguageOption = {
 const HISTORY_STORAGE_KEY = 'alt-text-history';
 const USAGE_STORAGE_KEY = 'alt-text-usage';
 const DAILY_LIMIT = 5;
+const DEV_DISABLE_LIMIT = true;
 const LANGUAGE_STORAGE_KEY = 'alt-text-language';
 const LANGUAGES: LanguageOption[] = [
   { value: 'english', label: 'English' },
@@ -116,6 +117,8 @@ export default function Home() {
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const seoScore = getSeoScore(result);
+  const isLimitDisabled = DEV_DISABLE_LIMIT;
+  const isLimitReached = !isLimitDisabled && usageCount >= DAILY_LIMIT;
 
   useEffect(() => {
     try {
@@ -187,7 +190,7 @@ export default function Home() {
   }, [todayKey]);
 
   const handleSubmit = async () => {
-    if (usageCount >= DAILY_LIMIT) {
+    if (isLimitReached) {
       setError('You have reached your daily free limit of 5 generations. Upgrade for unlimited access.');
       return;
     }
@@ -411,11 +414,11 @@ export default function Home() {
                 padding: '16px 18px',
                 borderRadius: '16px',
                 background:
-                  usageCount >= DAILY_LIMIT
+                  isLimitReached
                     ? 'linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(154, 52, 18, 0.22) 100%)'
                     : 'linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(15, 23, 42, 0.2) 100%)',
                 border:
-                  usageCount >= DAILY_LIMIT
+                  isLimitReached
                     ? '1px solid rgba(251, 191, 36, 0.34)'
                     : '1px solid rgba(96, 165, 250, 0.18)',
                 display: 'flex',
@@ -430,7 +433,9 @@ export default function Home() {
                   Upgrade for unlimited
                 </strong>
                 <span style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
-                  {usageCount >= DAILY_LIMIT
+                  {isLimitDisabled
+                    ? 'Development mode: daily limit is temporarily disabled.'
+                    : isLimitReached
                     ? 'Your free daily limit is reached.'
                     : `${DAILY_LIMIT - usageCount} free generation${DAILY_LIMIT - usageCount === 1 ? '' : 's'} left today.`}
                 </span>
@@ -532,23 +537,23 @@ export default function Home() {
             >
               <button
                 onClick={handleSubmit}
-                disabled={loading || usageCount >= DAILY_LIMIT}
+                disabled={loading || isLimitReached}
                 style={{
                   padding: '14px 20px',
                   fontSize: '15px',
                   border: '1px solid rgba(96, 165, 250, 0.35)',
                   borderRadius: '14px',
-                  background: loading || usageCount >= DAILY_LIMIT
+                  background: loading || isLimitReached
                     ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
                     : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#fff',
-                  cursor: loading || usageCount >= DAILY_LIMIT ? 'not-allowed' : 'pointer',
+                  cursor: loading || isLimitReached ? 'not-allowed' : 'pointer',
                   fontWeight: 700,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '10px',
                   boxShadow:
-                    loading || usageCount >= DAILY_LIMIT
+                    loading || isLimitReached
                       ? 'none'
                       : '0 14px 36px rgba(37, 99, 235, 0.30)',
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
@@ -567,7 +572,7 @@ export default function Home() {
                     }}
                   />
                 ) : null}
-                {loading ? 'Generating...' : usageCount >= DAILY_LIMIT ? 'Limit reached' : 'Generate'}
+                {loading ? 'Generating...' : isLimitReached ? 'Limit reached' : 'Generate'}
               </button>
 
               <button

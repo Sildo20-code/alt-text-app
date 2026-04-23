@@ -3,6 +3,7 @@ const HISTORY_KEY = 'altTextGeneratorHistory';
 const HISTORY_LIMIT = 5;
 const USAGE_KEY = 'altTextGeneratorUsage';
 const DAILY_LIMIT = 5;
+const DEV_DISABLE_LIMIT = true;
 const LANGUAGE_KEY = 'altTextGeneratorLanguage';
 const VARIATIONS = [
   { key: 'seo', label: 'SEO optimized', placeholder: 'Your SEO-focused alt text will appear here.' },
@@ -101,11 +102,13 @@ function saveLanguage(language) {
 function updateUsageUi() {
   const usage = loadUsage();
   const remaining = Math.max(0, DAILY_LIMIT - usage.count);
-  const limited = usage.count >= DAILY_LIMIT;
+  const limited = !DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT;
 
-  usageMessage.textContent = limited
-    ? 'Your free daily limit is reached.'
-    : `${remaining} free generation${remaining === 1 ? '' : 's'} left today.`;
+  usageMessage.textContent = DEV_DISABLE_LIMIT
+    ? 'Development mode: daily limit is temporarily disabled.'
+    : limited
+      ? 'Your free daily limit is reached.'
+      : `${remaining} free generation${remaining === 1 ? '' : 's'} left today.`;
   usageBadge.textContent = `${usage.count}/${DAILY_LIMIT} used today`;
   upgradeBanner.dataset.limited = limited ? 'true' : 'false';
   return usage;
@@ -118,7 +121,7 @@ async function getActiveTab() {
 
 function setLoadingState(isLoading) {
   const usage = loadUsage();
-  const limited = usage.count >= DAILY_LIMIT;
+  const limited = !DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT;
 
   generateButton.disabled = isLoading || !activeContext.url || limited;
   generateButton.textContent = isLoading
@@ -363,7 +366,7 @@ async function generateAltText() {
   }
 
   const usage = updateUsageUi();
-  if (usage.count >= DAILY_LIMIT) {
+  if (!DEV_DISABLE_LIMIT && usage.count >= DAILY_LIMIT) {
     setError('You have reached your daily free limit. Upgrade for unlimited access.');
     setLoadingState(false);
     return;
