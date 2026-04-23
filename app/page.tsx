@@ -16,7 +16,7 @@ type LanguageOption = {
 const HISTORY_STORAGE_KEY = 'alt-text-history';
 const USAGE_STORAGE_KEY = 'alt-text-usage';
 const DAILY_LIMIT = 5;
-const DEV_DISABLE_LIMIT = true;
+const DEV_DISABLE_LIMIT = false;
 const LANGUAGE_STORAGE_KEY = 'alt-text-language';
 const LANGUAGES: LanguageOption[] = [
   { value: 'english', label: 'English' },

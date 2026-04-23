@@ -3,7 +3,7 @@ const HISTORY_KEY = 'altTextGeneratorHistory';
 const HISTORY_LIMIT = 5;
 const USAGE_KEY = 'altTextGeneratorUsage';
 const DAILY_LIMIT = 5;
-const DEV_DISABLE_LIMIT = true;
+const DEV_DISABLE_LIMIT = false;
 const LANGUAGE_KEY = 'altTextGeneratorLanguage';
 const VARIATIONS = [
   { key: 'seo', label: 'SEO optimized', placeholder: 'Your SEO-focused alt text will appear here.' },
