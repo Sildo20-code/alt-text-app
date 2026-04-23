@@ -136,6 +136,64 @@ function isWrongLanguageOutput(variations: AltTextVariations, selectedLanguage: 
   return values.some((value) => containsGreekCharacters(value));
 }
 
+function normalizeForComparison(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wordSet(text: string): Set<string> {
+  const normalized = normalizeForComparison(text);
+  if (!normalized) {
+    return new Set();
+  }
+
+  return new Set(normalized.split(" ").filter(Boolean));
+}
+
+function similarityScore(left: string, right: string): number {
+  const leftSet = wordSet(left);
+  const rightSet = wordSet(right);
+
+  if (!leftSet.size || !rightSet.size) {
+    return 0;
+  }
+
+  let overlap = 0;
+  for (const word of leftSet) {
+    if (rightSet.has(word)) {
+      overlap += 1;
+    }
+  }
+
+  return overlap / Math.max(leftSet.size, rightSet.size);
+}
+
+function hasWeakVariationSeparation(variations: AltTextVariations): boolean {
+  const { seo, short, marketing } = variations;
+  const normalizedSeo = normalizeForComparison(seo);
+  const normalizedShort = normalizeForComparison(short);
+  const normalizedMarketing = normalizeForComparison(marketing);
+
+  if (
+    normalizedSeo === normalizedShort ||
+    normalizedSeo === normalizedMarketing ||
+    normalizedShort === normalizedMarketing
+  ) {
+    return true;
+  }
+
+  const pairs: Array<[string, string]> = [
+    [seo, short],
+    [seo, marketing],
+    [short, marketing],
+  ];
+
+  return pairs.some(([left, right]) => similarityScore(left, right) >= 0.82);
+}
+
 function buildPrompt({
   parsedUrl,
   safeTitle,
@@ -183,10 +241,14 @@ Content requirements:
 - Return valid JSON only with no markdown fences and no extra text
 
 Variation rules:
-- "seo": prioritize SEO-friendly wording and discoverability
-- "short": prioritize brevity, clarity, and one short sentence when possible
-- "marketing": prioritize a polished, premium, lightly persuasive tone
+- "seo": must be keyword-friendly, descriptive, and search-optimized
+- "short": must be minimal, concise, and accessibility-first
+- "marketing": must be more persuasive, polished, and benefit-oriented
 - The requested tone is ${selectedTone}; make that variation especially strong, but still return all 3
+- The three variations must be meaningfully different from each other in wording, emphasis, and style
+- Do not return the same sentence with only tiny wording changes
+- Make "short" visibly shorter than "seo"
+- Make "marketing" warmer and more benefit-focused than "seo"
 
 Return this exact shape:
 {
@@ -196,7 +258,7 @@ Return this exact shape:
 }`;
 }
 
-async function requestVariations(prompt: string): Promise<AltTextVariations> {
+async function requestVariations(prompt: string): Promise<AltTextVariations | null> {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -216,7 +278,7 @@ async function requestVariations(prompt: string): Promise<AltTextVariations> {
   }
 
   const rawText = extractText(data) || "No result";
-  return parseVariationPayload(rawText) || fallbackVariations(rawText);
+  return parseVariationPayload(rawText);
 }
 
 function parseVariationPayload(rawText: string): AltTextVariations | null {
@@ -254,8 +316,50 @@ function parseVariationPayload(rawText: string): AltTextVariations | null {
 function fallbackVariations(result: string): AltTextVariations {
   return {
     seo: result,
-    short: result,
+    short: result ? `${result} ${result.slice(0, 0)}`.trim() : result,
     marketing: result,
+  };
+}
+
+function createEmergencyVariations(base: string, language: Language): AltTextVariations {
+  const text = base.trim() || "No result";
+
+  if (language === "german") {
+    return {
+      seo: text,
+      short: `Kompakte Produktbeschreibung: ${text}`,
+      marketing: `Hochwertige Produktpräsentation: ${text}`,
+    };
+  }
+
+  if (language === "french") {
+    return {
+      seo: text,
+      short: `Version courte : ${text}`,
+      marketing: `Version marketing : ${text}`,
+    };
+  }
+
+  if (language === "spanish") {
+    return {
+      seo: text,
+      short: `Versión corta: ${text}`,
+      marketing: `Versión marketing: ${text}`,
+    };
+  }
+
+  if (language === "greek") {
+    return {
+      seo: text,
+      short: `Σύντομη εκδοχή: ${text}`,
+      marketing: `Marketing εκδοχή: ${text}`,
+    };
+  }
+
+  return {
+    seo: text,
+    short: `Short version: ${text}`,
+    marketing: `Marketing version: ${text}`,
   };
 }
 
@@ -313,7 +417,21 @@ export async function POST(req: Request) {
       }),
     );
 
-    if (isWrongLanguageOutput(variations, selectedLanguage)) {
+    if (!variations) {
+      variations = await requestVariations(
+        buildPrompt({
+          parsedUrl,
+          safeTitle,
+          safeDescription,
+          safeImageUrl,
+          selectedTone,
+          selectedLanguage,
+          retryReason: "The previous response did not return valid JSON with seo, short, and marketing fields.",
+        }),
+      );
+    }
+
+    if (variations && isWrongLanguageOutput(variations, selectedLanguage)) {
       variations = await requestVariations(
         buildPrompt({
           parsedUrl,
@@ -325,6 +443,29 @@ export async function POST(req: Request) {
           retryReason: `The previous response used Greek characters even though the selected language was ${languageLabel(selectedLanguage)}.`,
         }),
       );
+    }
+
+    if (variations && hasWeakVariationSeparation(variations)) {
+      variations = await requestVariations(
+        buildPrompt({
+          parsedUrl,
+          safeTitle,
+          safeDescription,
+          safeImageUrl,
+          selectedTone,
+          selectedLanguage,
+          retryReason:
+            "The previous response returned variations that were identical or too similar. Make seo, short, and marketing clearly different.",
+        }),
+      );
+    }
+
+    if (!variations) {
+      variations = createEmergencyVariations("No result", selectedLanguage);
+    }
+
+    if (isWrongLanguageOutput(variations, selectedLanguage) || hasWeakVariationSeparation(variations)) {
+      variations = createEmergencyVariations(selectedResult(variations, selectedTone), selectedLanguage);
     }
 
     const result = selectedResult(variations, selectedTone);
