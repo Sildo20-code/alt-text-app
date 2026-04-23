@@ -8,9 +8,22 @@ type HistoryItem = {
   result: string;
 };
 
+type LanguageOption = {
+  value: 'english' | 'greek' | 'german' | 'french' | 'spanish';
+  label: string;
+};
+
 const HISTORY_STORAGE_KEY = 'alt-text-history';
 const USAGE_STORAGE_KEY = 'alt-text-usage';
 const DAILY_LIMIT = 5;
+const LANGUAGE_STORAGE_KEY = 'alt-text-language';
+const LANGUAGES: LanguageOption[] = [
+  { value: 'english', label: 'English' },
+  { value: 'greek', label: 'Greek' },
+  { value: 'german', label: 'German' },
+  { value: 'french', label: 'French' },
+  { value: 'spanish', label: 'Spanish' },
+];
 
 const featureItems = [
   {
@@ -18,8 +31,8 @@ const featureItems = [
     description: 'Generate alt text designed to support search visibility and stronger product metadata.',
   },
   {
-    title: 'Greek language support',
-    description: 'Create natural, fluent Greek alt text that feels polished and ecommerce-ready.',
+    title: 'Multilingual output',
+    description: 'Create natural, polished alt text in English, Greek, German, French, or Spanish.',
   },
   {
     title: 'Fast and simple',
@@ -99,9 +112,35 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usageCount, setUsageCount] = useState(0);
+  const [language, setLanguage] = useState<LanguageOption['value']>('english');
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const seoScore = getSeoScore(result);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (
+        stored === 'english' ||
+        stored === 'greek' ||
+        stored === 'german' ||
+        stored === 'french' ||
+        stored === 'spanish'
+      ) {
+        setLanguage(stored);
+      }
+    } catch {
+      window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+    } catch {
+      // Ignore localStorage write failures.
+    }
+  }, [language]);
 
   useEffect(() => {
     try {
@@ -162,7 +201,7 @@ export default function Home() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, language }),
       });
 
       const data = await res.json();
@@ -360,10 +399,10 @@ export default function Home() {
                 Generator
               </div>
               <h2 style={{ margin: 0, fontSize: '32px', lineHeight: 1.1 }}>
-                Turn product URLs into polished Greek alt text
+                Turn product URLs into polished multilingual alt text
               </h2>
               <p style={{ margin: 0, color: '#94a3b8', lineHeight: 1.75, fontSize: '16px' }}>
-                Built for ecommerce teams that need fast, descriptive, SEO-aware product image text.
+                Built for ecommerce teams that need fast, descriptive, SEO-aware product image text across markets.
               </p>
             </div>
 
@@ -443,6 +482,44 @@ export default function Home() {
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
                 }}
               />
+            </div>
+
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <label
+                htmlFor="language"
+                style={{
+                  display: 'block',
+                  color: '#e2e8f0',
+                  fontWeight: 600,
+                  fontSize: '15px',
+                }}
+              >
+                Output language
+              </label>
+
+              <select
+                id="language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as LanguageOption['value'])}
+                style={{
+                  width: '100%',
+                  padding: '16px 18px',
+                  fontSize: '16px',
+                  borderRadius: '16px',
+                  border: '1px solid #334155',
+                  background: 'rgba(2, 6, 23, 0.72)',
+                  color: '#f8fafc',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+                }}
+              >
+                {LANGUAGES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div

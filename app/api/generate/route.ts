@@ -34,6 +34,7 @@ function extractText(data: any): string {
 }
 
 type Tone = "seo" | "marketing" | "short";
+type Language = "english" | "greek" | "german" | "french" | "spanish";
 
 type AltTextVariations = {
   seo: string;
@@ -52,6 +53,44 @@ function normalizeTone(value: unknown): Tone {
   }
 
   return "seo";
+}
+
+function normalizeLanguage(value: unknown): Language {
+  if (typeof value !== "string") {
+    return "english";
+  }
+
+  const language = value.trim().toLowerCase();
+  if (
+    language === "greek" ||
+    language === "german" ||
+    language === "french" ||
+    language === "spanish"
+  ) {
+    return language;
+  }
+
+  return "english";
+}
+
+function languageInstruction(language: Language): string {
+  if (language === "greek") {
+    return "Write all output in natural modern Greek.";
+  }
+
+  if (language === "german") {
+    return "Write all output in natural professional German.";
+  }
+
+  if (language === "french") {
+    return "Write all output in natural professional French.";
+  }
+
+  if (language === "spanish") {
+    return "Write all output in natural professional Spanish.";
+  }
+
+  return "Write all output in natural professional English.";
 }
 
 function parseVariationPayload(rawText: string): AltTextVariations | null {
@@ -100,7 +139,7 @@ function selectedResult(variations: AltTextVariations, tone: Tone): string {
 
 export async function POST(req: Request) {
   try {
-    const { url, title, description, imageUrl, tone } = await req.json();
+    const { url, title, description, imageUrl, tone, language } = await req.json();
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -135,6 +174,7 @@ export async function POST(req: Request) {
     const safeImageUrl =
       typeof imageUrl === "string" && imageUrl.trim() ? imageUrl.trim() : "No product image URL provided";
     const selectedTone = normalizeTone(tone);
+    const selectedLanguage = normalizeLanguage(language);
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -144,20 +184,24 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `You are an expert Greek ecommerce copywriter and SEO specialist.
+        input: `You are an expert international ecommerce copywriter and SEO specialist.
 
-Create exactly 3 alt text variations in natural, fluent Greek for the product page below.
+Create exactly 3 alt text variations for the product page below.
 
 Product page URL: ${parsedUrl.toString()}
 Detected product title: ${safeTitle}
 Detected meta description: ${safeDescription}
 Detected main product image URL: ${safeImageUrl}
 Requested tone: ${selectedTone}
+Requested language: ${selectedLanguage}
 
 Requirements:
-- Write in high-quality modern Greek
+- ${languageInstruction(selectedLanguage)}
 - Detect the likely product type from the URL, title, and image URL clues
 - Make all versions specific, product-related, and visually descriptive
+- Make the wording concise, natural, SEO-friendly, and accessibility-friendly
+- Include likely product type, color, and material when they can be reasonably inferred
+- Mention likely use-case only when it adds real clarity
 - Mention likely color, material, and use-case when they can be reasonably inferred
 - If exact details are unknown, use the most likely safe ecommerce wording without inventing unrealistic claims
 - Keep every variation to a maximum of 2 sentences
@@ -196,6 +240,7 @@ Return this exact shape:
       {
         result,
         selectedTone,
+        selectedLanguage,
         variations,
       },
       { headers: corsHeaders },

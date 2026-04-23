@@ -3,6 +3,7 @@ const HISTORY_KEY = 'altTextGeneratorHistory';
 const HISTORY_LIMIT = 5;
 const USAGE_KEY = 'altTextGeneratorUsage';
 const DAILY_LIMIT = 5;
+const LANGUAGE_KEY = 'altTextGeneratorLanguage';
 const VARIATIONS = [
   { key: 'seo', label: 'SEO optimized', placeholder: 'Your SEO-focused alt text will appear here.' },
   { key: 'short', label: 'Short version', placeholder: 'Your shorter alt text version will appear here.' },
@@ -13,6 +14,7 @@ const currentUrlField = document.getElementById('current-url');
 const pageTitleField = document.getElementById('page-title');
 const pageDescriptionField = document.getElementById('page-description');
 const toneSelector = document.getElementById('tone-selector');
+const languageSelector = document.getElementById('language-selector');
 const generateButton = document.getElementById('generate-button');
 const copyAllButton = document.getElementById('copy-all-button');
 const exportButton = document.getElementById('export-button');
@@ -77,6 +79,25 @@ function saveUsage(count) {
   );
 }
 
+function loadLanguage() {
+  const stored = localStorage.getItem(LANGUAGE_KEY);
+  if (
+    stored === 'english' ||
+    stored === 'greek' ||
+    stored === 'german' ||
+    stored === 'french' ||
+    stored === 'spanish'
+  ) {
+    return stored;
+  }
+
+  return 'english';
+}
+
+function saveLanguage(language) {
+  localStorage.setItem(LANGUAGE_KEY, language);
+}
+
 function updateUsageUi() {
   const usage = loadUsage();
   const remaining = Math.max(0, DAILY_LIMIT - usage.count);
@@ -106,6 +127,7 @@ function setLoadingState(isLoading) {
       ? 'Limit reached'
       : 'Generate Alt Text';
   toneSelector.disabled = isLoading;
+  languageSelector.disabled = isLoading;
   if (isLoading) {
     copyAllButton.disabled = true;
     exportButton.disabled = true;
@@ -225,6 +247,7 @@ function buildPayload(tone) {
     description: activeContext.description,
     imageUrl: activeContext.imageUrl,
     tone,
+    language: languageSelector.value || 'english',
   };
 }
 
@@ -477,6 +500,10 @@ function clearResult() {
   setAllResults({});
 }
 
+languageSelector.value = loadLanguage();
+languageSelector.addEventListener('change', () => {
+  saveLanguage(languageSelector.value || 'english');
+});
 generateButton.addEventListener('click', generateAltText);
 copyAllButton.addEventListener('click', copyAllResults);
 exportButton.addEventListener('click', exportVariations);
