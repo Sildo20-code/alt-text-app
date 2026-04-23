@@ -42,6 +42,16 @@ type AltTextVariations = {
   marketing: string;
 };
 
+type PromptInput = {
+  parsedUrl: URL;
+  safeTitle: string;
+  safeDescription: string;
+  safeImageUrl: string;
+  selectedTone: Tone;
+  selectedLanguage: Language;
+  retryReason?: string;
+};
+
 function normalizeTone(value: unknown): Tone {
   if (typeof value !== "string") {
     return "seo";
@@ -113,6 +123,102 @@ function languageLabel(language: Language): string {
   return "English";
 }
 
+function containsGreekCharacters(text: string): boolean {
+  return /[\u0370-\u03ff\u1f00-\u1fff]/i.test(text);
+}
+
+function isWrongLanguageOutput(variations: AltTextVariations, selectedLanguage: Language): boolean {
+  if (selectedLanguage === "greek") {
+    return false;
+  }
+
+  const values = [variations.seo, variations.short, variations.marketing];
+  return values.some((value) => containsGreekCharacters(value));
+}
+
+function buildPrompt({
+  parsedUrl,
+  safeTitle,
+  safeDescription,
+  safeImageUrl,
+  selectedTone,
+  selectedLanguage,
+  retryReason,
+}: PromptInput): string {
+  const languageName = languageLabel(selectedLanguage);
+  const retryBlock = retryReason
+    ? `
+Previous attempt failed:
+- ${retryReason}
+- Correct the language issue now.
+`
+    : "";
+
+  return `You are an expert international ecommerce copywriter and SEO specialist.
+
+Create exactly 3 alt text variations for the product page below.
+
+Product page URL: ${parsedUrl.toString()}
+Detected product title: ${safeTitle}
+Detected meta description: ${safeDescription}
+Detected main product image URL: ${safeImageUrl}
+Requested tone: ${selectedTone}
+Requested language: ${selectedLanguage}
+${retryBlock}
+IMPORTANT LANGUAGE RULE:
+- Output must be written ONLY in ${languageName}.
+- Never use Greek unless the requested language is Greek.
+- If the title, description, or URL clues are in another language, translate or adapt them into ${languageName} before writing the final outputs.
+- Every value in the JSON response must be fully written in ${languageName}.
+
+Content requirements:
+- Detect the likely product type from the URL, title, description, and image clues
+- Make all versions specific, product-related, and visually descriptive
+- Make the wording concise, natural, SEO-friendly, and accessibility-friendly
+- Include likely product type, color, and material when they can be reasonably inferred
+- Mention likely use-case only when it adds real clarity
+- If exact details are unknown, use the most likely safe ecommerce wording without inventing unrealistic claims
+- Keep every variation to a maximum of 2 sentences
+- Do not use quotation marks inside the output text
+- Return valid JSON only with no markdown fences and no extra text
+
+Variation rules:
+- "seo": prioritize SEO-friendly wording and discoverability
+- "short": prioritize brevity, clarity, and one short sentence when possible
+- "marketing": prioritize a polished, premium, lightly persuasive tone
+- The requested tone is ${selectedTone}; make that variation especially strong, but still return all 3
+
+Return this exact shape:
+{
+  "seo": "text in ${languageName}",
+  "short": "text in ${languageName}",
+  "marketing": "text in ${languageName}"
+}`;
+}
+
+async function requestVariations(prompt: string): Promise<AltTextVariations> {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      input: prompt,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || "OpenAI request failed");
+  }
+
+  const rawText = extractText(data) || "No result";
+  return parseVariationPayload(rawText) || fallbackVariations(rawText);
+}
+
 function parseVariationPayload(rawText: string): AltTextVariations | null {
   const normalized = rawText.trim();
   const candidates = [normalized];
@@ -159,7 +265,7 @@ function selectedResult(variations: AltTextVariations, tone: Tone): string {
 
 export async function POST(req: Request) {
   try {
-    const { url, title, description, imageUrl, tone, language } = await req.json();
+    const { url, language, tone, title, description, imageUrl } = await req.json();
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -196,68 +302,31 @@ export async function POST(req: Request) {
     const selectedTone = normalizeTone(tone);
     const selectedLanguage = normalizeLanguage(language);
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        input: `You are an expert international ecommerce copywriter and SEO specialist.
-
-Create exactly 3 alt text variations for the product page below.
-
-Product page URL: ${parsedUrl.toString()}
-Detected product title: ${safeTitle}
-Detected meta description: ${safeDescription}
-Detected main product image URL: ${safeImageUrl}
-Requested tone: ${selectedTone}
-Requested language: ${selectedLanguage}
-
-Requirements:
-- ${languageInstruction(selectedLanguage)}
-- All 3 variations must be written entirely in ${languageLabel(selectedLanguage)}
-- If the detected title, description, or URL hints are in another language, still generate the final output in ${languageLabel(selectedLanguage)}
-- Translate or adapt product clues into ${languageLabel(selectedLanguage)} when needed
-- Never default to Greek unless the requested language is Greek
-- Detect the likely product type from the URL, title, and image URL clues
-- Make all versions specific, product-related, and visually descriptive
-- Make the wording concise, natural, SEO-friendly, and accessibility-friendly
-- Include likely product type, color, and material when they can be reasonably inferred
-- Mention likely use-case only when it adds real clarity
-- Mention likely color, material, and use-case when they can be reasonably inferred
-- If exact details are unknown, use the most likely safe ecommerce wording without inventing unrealistic claims
-- Keep every variation to a maximum of 2 sentences
-- Do not use quotation marks
-- Return valid JSON only
-
-Variation rules:
-- "seo": prioritize SEO-friendly wording and discoverability
-- "short": prioritize brevity, clarity, and one short sentence when possible
-- "marketing": prioritize a polished, premium, lightly persuasive tone
-- The requested tone is ${selectedTone}; make that variation especially strong, but still return all 3
-
-Return this exact shape:
-{
-  "seo": "text in ${languageLabel(selectedLanguage)}",
-  "short": "text in ${languageLabel(selectedLanguage)}",
-  "marketing": "text in ${languageLabel(selectedLanguage)}"
-}`,
+    let variations = await requestVariations(
+      buildPrompt({
+        parsedUrl,
+        safeTitle,
+        safeDescription,
+        safeImageUrl,
+        selectedTone,
+        selectedLanguage,
       }),
-    });
+    );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: data?.error?.message || "OpenAI request failed" },
-        { status: response.status, headers: corsHeaders },
+    if (isWrongLanguageOutput(variations, selectedLanguage)) {
+      variations = await requestVariations(
+        buildPrompt({
+          parsedUrl,
+          safeTitle,
+          safeDescription,
+          safeImageUrl,
+          selectedTone,
+          selectedLanguage,
+          retryReason: `The previous response used Greek characters even though the selected language was ${languageLabel(selectedLanguage)}.`,
+        }),
       );
     }
 
-    const rawText = extractText(data) || "No result";
-    const variations = parseVariationPayload(rawText) || fallbackVariations(rawText);
     const result = selectedResult(variations, selectedTone);
 
     return NextResponse.json(
