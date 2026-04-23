@@ -1,0 +1,33 @@
+SEO Alt Text Assistant Privacy Policy
+
+Last updated: 2026-04-23
+
+SEO Alt Text Assistant is designed to help users generate alt text for ecommerce product pages.
+
+What the extension accesses
+- The current tab URL
+- Public page metadata such as page title and meta description
+- Local extension storage for history and daily usage count
+
+What the extension stores locally
+- Recent generation history
+- Daily free usage counter
+- Selected workflow data needed for popup functionality
+
+What the extension sends
+- When the user clicks Generate, the extension sends the current page URL and detected page metadata to the connected API endpoint in order to generate alt text variations.
+
+What the extension does not do
+- It does not collect passwords, payment details, or private form inputs
+- It does not sell user data
+- It does not run background scraping beyond the current page context needed for the feature
+
+Third-party services
+- Alt text generation is powered by the connected API service configured by the extension publisher
+
+User control
+- Users can clear local browser extension data by removing the extension or clearing extension storage
+- Users can choose when to generate results; no automatic submission occurs without user action
+
+Support
+For privacy or support questions, contact the publisher using the details in support.txt.

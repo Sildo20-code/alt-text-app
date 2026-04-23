@@ -1,0 +1,63 @@
+Chrome Web Store Submission Checklist
+
+Branding
+- Confirm extension name: SEO Alt Text Assistant
+- Confirm final short description
+- Confirm final full description
+- Replace placeholder support email in support.txt
+
+Icons required
+- 16x16 toolbar icon
+- 32x32 management page icon
+- 48x48 extension listing icon
+- 128x128 Chrome Web Store icon
+
+Current icon status
+- Placeholder documentation exists in icons/README.md
+- Real PNG icons still need to be created and added before submission
+
+Recommended screenshots
+1. Popup on a product page with URL and detected metadata visible
+   Title suggestion: Generate alt text directly from any product page
+2. Three generated variations visible in the popup
+   Title suggestion: Get SEO, Short, and Marketing versions instantly
+3. Copy All and Export TXT actions visible
+   Title suggestion: Copy or export results for your workflow
+4. History section with saved generations
+   Title suggestion: Reuse recent generations without starting over
+5. Upgrade banner and usage limit state
+   Title suggestion: Lightweight free access with upgrade path
+
+Recommended promo materials
+- 128x128 icon
+- Small tile graphics if needed later
+- Optional promo images for future store optimization
+
+Before you upload the ZIP
+- Confirm manifest.json is final
+- Confirm popup opens without errors
+- Confirm Generate works on real ecommerce product pages
+- Confirm Copy buttons work
+- Confirm Copy All works
+- Confirm Export TXT downloads correctly
+- Confirm history and timestamps display correctly
+- Confirm usage limit works
+- Confirm no localhost URLs remain
+- Confirm no test/debug text remains
+
+ZIP packaging steps
+1. Open the chrome-extension folder
+2. Select only the extension files and folders that belong in the package
+3. Create a ZIP from the contents of the folder
+4. Do not ZIP the parent project root
+
+Publishing checklist
+- Upload ZIP to the Chrome Web Store Developer Dashboard
+- Add short description
+- Add full description
+- Add screenshots
+- Add icon assets
+- Add privacy policy details
+- Add support contact details
+- Review permissions and host access
+- Submit for review

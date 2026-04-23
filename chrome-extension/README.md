@@ -1,4 +1,4 @@
-# Chrome Extension MVP
+# SEO Alt Text Assistant
 
 This folder contains the local-loadable Manifest V3 extension for the Alt Text Generator SaaS.
 
@@ -25,5 +25,7 @@ The extension is configured to call:
 
 ## Store Prep Notes
 
-- Replace placeholder icons inside `icons/` before publishing
-- Review name, description, screenshots, and privacy details before submitting to the Chrome Web Store
+- Add real PNG icons inside `icons/` before publishing
+- Review the store copy in `store-description.txt`
+- Review the submission checklist in `store-checklist.txt`
+- Confirm privacy and support details before Chrome Web Store submission

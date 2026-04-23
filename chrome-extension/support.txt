@@ -1,0 +1,21 @@
+SEO Alt Text Assistant Support
+
+Support website
+https://alt-text-q6lg8jonb-ersil.vercel.app
+
+Support contact
+Add your preferred public support email here before publishing.
+
+Recommended support coverage
+- Installation help
+- Usage troubleshooting
+- Billing or upgrade questions
+- Bug reports
+- Chrome Web Store review follow-up
+
+Recommended response target
+- Within 1 to 2 business days
+
+Before publishing
+- Replace the placeholder support email with a real monitored address
+- Confirm the support URL is live and public
